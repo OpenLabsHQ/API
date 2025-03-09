@@ -1,6 +1,3 @@
-from pathlib import Path
-
-from cdktf import LocalBackend, TerraformStack
 from cdktf_cdktf_provider_aws.eip import Eip
 from cdktf_cdktf_provider_aws.instance import Instance
 from cdktf_cdktf_provider_aws.internet_gateway import InternetGateway
@@ -14,47 +11,40 @@ from cdktf_cdktf_provider_aws.security_group import SecurityGroup
 from cdktf_cdktf_provider_aws.security_group_rule import SecurityGroupRule
 from cdktf_cdktf_provider_aws.subnet import Subnet
 from cdktf_cdktf_provider_aws.vpc import Vpc
-from constructs import Construct
 
 from ....enums.operating_systems import AWS_OS_MAP
+from ....enums.regions import AWS_REGION_MAP, OpenLabsRegion
 from ....enums.specs import AWS_SPEC_MAP
 from ....schemas.template_range_schema import TemplateRangeSchema
+from .base_stack import AbstractBaseStack
 
 
-class AWSStack(TerraformStack):
+class AWSStack(AbstractBaseStack):
     """Stack for generating terraform for AWS."""
 
-    def __init__(
+    def build_resources(
         self,
-        scope: Construct,
-        cdktfid: str,
-        cyber_range: TemplateRangeSchema,
-        tmp_dir: str,
+        template_range: TemplateRangeSchema,
+        region: OpenLabsRegion,
     ) -> None:
         """Initialize AWS terraform stack.
 
         Args:
         ----
-            self (AWSStack): AWSStack class.
-            scope (Construct): CDKTF app
-            cdktfid (str): Unique ID for CDKTF app
-            cyber_range: Range object used for create all necessary resources to deploy
-            tmp_dir: Directory location for all terraform files
+            template_range (TemplateRangeSchema): Template range object to build terraform for.
+            region (OpenLabsRegion): Support OpenLabs cloud region.
+            secrets (SecretSchema): Cloud secrets.
 
         Returns:
         -------
             None
 
         """
-        super().__init__(scope, cdktfid)
-
-        LocalBackend(
+        AwsProvider(
             self,
-            path=str(Path(f"{tmp_dir}/stacks/{cdktfid}/terraform.{cdktfid}.tfstate")),
+            "AWS",
+            region=AWS_REGION_MAP[region],
         )
-
-        # AWS Provider
-        AwsProvider(self, "AWS", region="us-east-1")
 
         # Step 5: Create the key access to all instances provisioned on AWS
         key_pair = KeyPair(
@@ -65,7 +55,7 @@ class AWSStack(TerraformStack):
             tags={"Name": "cdktf-public-key"},
         )
 
-        for vpc in cyber_range.vpcs:
+        for vpc in template_range.vpcs:
 
             # Step 1: Create a VPC
             new_vpc = Vpc(

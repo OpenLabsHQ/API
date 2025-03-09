@@ -5,10 +5,10 @@ from sqlalchemy.dialects.postgresql import CIDR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.db.database import Base
-from .template_base_model import TemplateModelMixin
+from .template_base_model import OwnableObjectMixin
 
 
-class TemplateSubnetModel(Base, TemplateModelMixin):
+class TemplateSubnetModel(Base, OwnableObjectMixin):
     """SQLAlchemy ORM model for template subnet objects."""
 
     __tablename__ = "subnet_templates"

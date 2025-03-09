@@ -1,6 +1,7 @@
 import logging
 import os
-from typing import AsyncGenerator, Generator
+import shutil
+from typing import AsyncGenerator, Callable, Generator
 
 import httpx
 import pytest
@@ -15,8 +16,12 @@ from sqlalchemy.ext.asyncio import (
 )
 from testcontainers.postgres import PostgresContainer
 
+from src.app.core.cdktf.stacks.base_stack import AbstractBaseStack
 from src.app.core.db.database import Base, async_get_db
+from src.app.enums.regions import OpenLabsRegion
 from src.app.main import app
+from src.app.schemas.template_range_schema import TemplateRangeSchema
+from src.app.utils.cdktf_utils import create_cdktf_dir
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -91,6 +96,34 @@ def create_db_schema(postgres_container: str) -> None:
     finally:
         sync_engine.dispose()
         logger.info("Sync engine disposed after schema creation.")
+
+
+@pytest.fixture(scope="module")
+def synthesize_factory(
+    request: pytest.FixtureRequest,
+) -> Callable[[type[AbstractBaseStack], TemplateRangeSchema, str, OpenLabsRegion], str]:
+    """Get factory to generate CDKTF synthesis for different stack classes."""
+    from cdktf import Testing
+
+    def _synthesize(
+        stack_cls: type[AbstractBaseStack],
+        cyber_range: TemplateRangeSchema,
+        stack_name: str = "test_range",
+        region: OpenLabsRegion = OpenLabsRegion.US_EAST_1,
+    ) -> str:
+        """Synthesize generic stack using CDKTF testing library."""
+        app = Testing.app()
+        test_dir = create_cdktf_dir()
+
+        # Register a finalizer to remove the directory after the test module finishes
+        request.addfinalizer(lambda: shutil.rmtree(test_dir, ignore_errors=True))
+
+        # Synthesize the stack using the provided stack class
+        return str(
+            Testing.synth(stack_cls(app, cyber_range, stack_name, test_dir, region))
+        )
+
+    return _synthesize
 
 
 @pytest_asyncio.fixture(scope="function")

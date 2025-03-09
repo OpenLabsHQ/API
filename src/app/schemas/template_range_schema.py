@@ -15,9 +15,8 @@ class TemplateRangeBaseSchema(BaseModel):
         description="Cloud provider",
         examples=[OpenLabsProvider.AWS, OpenLabsProvider.AZURE],
     )
-
     name: str = Field(
-        ..., description="Range name", min_length=1, examples=["example-range-1"]
+        ..., description="Template name", min_length=1, examples=["template-range-1"]
     )
     vnc: bool = Field(default=False, description="Enable automatic VNC configuration")
     vpn: bool = Field(default=False, description="Enable automatic VPN configuration")

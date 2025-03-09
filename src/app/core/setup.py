@@ -4,6 +4,7 @@ from typing import Any, AsyncContextManager, AsyncGenerator, Callable
 from fastapi import APIRouter, FastAPI
 
 from ..crud.crud_users import create_user, get_user
+from ..middlewares.yaml_middleware import add_yaml_middleware_to_router
 from ..schemas.user_schema import UserCreateBaseSchema
 from ..utils.crypto import (
     encrypt_private_key,
@@ -136,5 +137,7 @@ def create_application(
 
     app = FastAPI(lifespan=lifespan, **kwargs)
     app.include_router(router)
+
+    add_yaml_middleware_to_router(app, router_path="/api/v1/templates")
 
     return app

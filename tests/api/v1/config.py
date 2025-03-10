@@ -1,5 +1,7 @@
 import copy
 from typing import Any
+import uuid
+from src.app.enums.regions import OpenLabsRegion
 
 # Base route
 BASE_ROUTE = "/api/v1"
@@ -36,6 +38,15 @@ valid_range_payload: dict[str, Any] = {
     "name": "example-range-1",
     "vnc": False,
     "vpn": False,
+}
+
+# Valid range payload for deployment
+valid_range_deploy_payload: dict[str, Any] = {
+    "name": "test-deploy-range-1",
+    "description": "test range to deploy",
+    "template_id": str(uuid.uuid4()),
+    "region": OpenLabsRegion.US_EAST_1.value,
+    "readme": "",
 }
 
 valid_vpc_payload = copy.deepcopy(valid_range_payload["vpcs"][0])

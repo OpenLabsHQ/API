@@ -191,7 +191,17 @@ async def get_decrypted_secrets(
         return None
 
     # Fetch the user's secrets from the database
-    stmt = select(SecretModel).where(SecretModel.user_id == user.id)
+    mapped_secret_model = inspect(SecretModel)
+    main_columns = [
+        getattr(SecretModel, attr.key) for attr in mapped_secret_model.column_attrs
+    ]
+
+    stmt = (
+        select(SecretModel)
+        .where(SecretModel.user_id == user.id)
+        .options(load_only(*main_columns))
+    )
+
     result = await db.execute(stmt)
     secrets = result.scalars().first()
 

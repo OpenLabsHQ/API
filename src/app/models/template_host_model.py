@@ -7,10 +7,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.db.database import Base
 from ..enums.operating_systems import OpenLabsOS
 from ..enums.specs import OpenLabsSpec
-from .template_base_model import TemplateModelMixin
+from .template_base_model import OwnableObjectMixin
 
 
-class TemplateHostModel(Base, TemplateModelMixin):
+class TemplateHostModel(Base, OwnableObjectMixin):
     """SQLAlchemy ORM model for template host."""
 
     __tablename__ = "host_templates"

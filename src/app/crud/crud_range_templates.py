@@ -84,31 +84,6 @@ async def get_range_template(
     return result.scalar_one_or_none()
 
 
-async def is_range_template_owner(
-    db: AsyncSession, range_id: TemplateRangeID, user_id: uuid.UUID
-) -> bool:
-    """Check if a user is the owner of a range template.
-
-    Args:
-    ----
-        db (Session): Database connection.
-        range_id (TemplateRangeID): ID of the range template.
-        user_id (uuid.UUID): ID of the user.
-
-    Returns:
-    -------
-        bool: True if the user is the owner, False otherwise.
-
-    """
-    stmt = (
-        select(TemplateRangeModel)
-        .filter(TemplateRangeModel.id == range_id.id)
-        .filter(TemplateRangeModel.owner_id == user_id)
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none() is not None
-
-
 async def create_range_template(
     db: AsyncSession, range_template: TemplateRangeBaseSchema, owner_id: uuid.UUID
 ) -> TemplateRangeModel:

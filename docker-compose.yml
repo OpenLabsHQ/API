@@ -43,13 +43,32 @@ services:
     ports:
       - "${API_IP_ADDR:-127.0.0.1}:${API_PORT:-8000}:80"
     depends_on:
+      redis:
+        condition: service_healthy
       postgres:
         condition: service_healthy
     networks:
       - fastapi_network
 
+
+  redis:
+    image: redis:alpine
+    container_name: redis-queue
+    volumes:
+      - redis-data:/data
+    expose:
+      - "6379"
+    networks:
+      - fastapi_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+  redis-data:
 
 networks:
   fastapi_network:

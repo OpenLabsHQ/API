@@ -75,7 +75,16 @@ class PostgresSettings(DatabaseSettings):
     POSTGRES_URL: str | None = config("POSTGRES_URL", default=None)
 
 
-class Settings(AppSettings, PostgresSettings, CDKTFSettings, AuthSettings):
+class RedisQueueSettings(BaseSettings):
+    """Redis queue settings."""
+
+    REDIS_QUEUE_HOST: str = config("REDIS_QUEUE_HOST", default="localhost")
+    REDIS_QUEUE_PORT: int = config("REDIS_QUEUE_PORT", default=6379)
+
+
+class Settings(
+    AppSettings, PostgresSettings, CDKTFSettings, AuthSettings, RedisQueueSettings
+):
     """FastAPI app settings."""
 
     pass

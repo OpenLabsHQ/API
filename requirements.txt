@@ -16,3 +16,6 @@ bcrypt
 # Crypto
 cryptography>=41.0.0
 argon2-cffi>=23.1.0
+
+# Workers
+arq~=0.26

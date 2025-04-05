@@ -53,7 +53,6 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: redis-queue
     volumes:
       - redis-data:/data
     expose:

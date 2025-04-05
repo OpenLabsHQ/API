@@ -1,11 +1,15 @@
 from contextlib import asynccontextmanager
 from typing import Any, AsyncContextManager, AsyncGenerator, Callable
 
+import anyio
+from arq import create_pool
+from arq.connections import RedisSettings
 from fastapi import APIRouter, FastAPI
 
-from .config import AppSettings, DatabaseSettings
+from .config import AppSettings, DatabaseSettings, RedisQueueSettings, settings
 from .db.database import Base
 from .db.database import async_engine as engine
+from .utils import queue
 
 
 # Function to create database tables
@@ -15,21 +19,54 @@ async def create_tables() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
+async def create_redis_queue_pool() -> None:
+    """Create Redis queue pool."""
+    queue.pool = await create_pool(
+        RedisSettings(host=settings.REDIS_QUEUE_HOST, port=settings.REDIS_QUEUE_PORT)
+    )
+
+
+async def close_redis_queue_pool() -> None:
+    """Close Redis queue pool."""
+    await queue.pool.aclose()  # type: ignore
+
+
+async def set_threadpool_tokens(number_of_tokens: int = 100) -> None:
+    """Set thread limit."""
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    limiter.total_tokens = number_of_tokens
+
+
 # Lifespan factory to manage app lifecycle events
 def lifespan_factory(
-    settings: DatabaseSettings | AppSettings,
+    settings: DatabaseSettings | AppSettings | RedisQueueSettings,
     create_tables_on_start: bool = True,
 ) -> Callable[[FastAPI], AsyncContextManager[Any]]:
     """Create a lifespan async context manager for a FastAPI app."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
+        from asyncio import Event
 
-        if isinstance(settings, DatabaseSettings) and create_tables_on_start:
-            await create_tables()
-            # Admin user creation moved to a separate script
+        initialization_complete = Event()
+        app.state.initialization_complete = initialization_complete
 
-        yield
+        await set_threadpool_tokens()
+
+        try:
+            if isinstance(settings, DatabaseSettings) and create_tables_on_start:
+                await create_tables()
+
+            if isinstance(settings, RedisQueueSettings):
+                await create_redis_queue_pool()
+
+            initialization_complete.set()
+
+            yield
+
+        finally:
+            if isinstance(settings, RedisQueueSettings):
+                await close_redis_queue_pool()
 
     return lifespan
 

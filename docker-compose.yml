@@ -1,20 +1,20 @@
 services:
-  postgres:
-    image: postgres:17
-    container_name: postgres_db_openlabsx
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_app
     env_file:
       - .env
     ports:
-      - "${POSTGRES_DEBUG_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "${API_IP_ADDR:-127.0.0.1}:${API_PORT:-8000}:80"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - fastapi_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # Create admin user after app has started
   init:
@@ -33,15 +33,13 @@ services:
     networks:
       - fastapi_network
 
-  fastapi:
+  worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: fastapi_app
+    command: arq src.app.core.worker.settings.WorkerSettings
     env_file:
       - .env
-    ports:
-      - "${API_IP_ADDR:-127.0.0.1}:${API_PORT:-8000}:80"
     depends_on:
       redis:
         condition: service_healthy
@@ -50,6 +48,22 @@ services:
     networks:
       - fastapi_network
 
+  postgres:
+    image: postgres:17
+    container_name: postgres_db_openlabsx
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_DEBUG_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fastapi_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:alpine

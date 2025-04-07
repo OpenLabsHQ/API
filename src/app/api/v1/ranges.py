@@ -1,18 +1,19 @@
 import base64
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from ...core.auth.auth import get_current_user
 from ...core.cdktf.ranges.range_factory import RangeFactory
 from ...core.db.database import async_get_db
+from ...core.utils import queue
 from ...crud.crud_range_templates import get_range_template
-from ...crud.crud_ranges import create_range, delete_range, get_range, is_range_owner
+from ...crud.crud_ranges import delete_range, get_range, is_range_owner
 from ...crud.crud_users import get_decrypted_secrets
-from ...enums.range_states import RangeState
 from ...models.user_model import UserModel
+from ...schemas.job import Job
 from ...schemas.message_schema import MessageSchema
 from ...schemas.range_schema import DeployRangeBaseSchema, RangeID, RangeSchema
 from ...schemas.template_range_schema import TemplateRangeID, TemplateRangeSchema
@@ -22,13 +23,13 @@ from ...validators.id import is_valid_uuid4
 router = APIRouter(prefix="/ranges", tags=["ranges"])
 
 
-@router.post("/deploy")
+@router.post("/deploy", status_code=status.HTTP_201_CREATED)
 async def deploy_range_from_template_endpoint(
     deploy_range: DeployRangeBaseSchema,
     db: AsyncSession = Depends(async_get_db),  # noqa: B008
     current_user: UserModel = Depends(get_current_user),  # noqa: B008
     enc_key: str | None = Cookie(None, alias="enc_key", include_in_schema=False),
-) -> RangeID:
+) -> Job:
     """Deploy range templates.
 
     Args:
@@ -40,7 +41,7 @@ async def deploy_range_from_template_endpoint(
 
     Returns:
     -------
-        RangeID: ID of deployed range.
+        Job: ID of range deploy job.
 
     """
     # Check if we have the encryption key needed to decrypt secrets
@@ -97,43 +98,31 @@ async def deploy_range_from_template_endpoint(
     if not range_to_deploy.has_secrets():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"No credentials found for provider: {template.provider}",
+            detail=f"No credentials found for provider: {template.provider.value}",
         )
 
-    # Deploy range
-    successful_synthesize = range_to_deploy.synthesize()
-    if not successful_synthesize:
+    # Queue deployment job
+    if not isinstance(queue.pool, Redis):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to synthesize range: {template.name} ({range_to_deploy.id})!",
+            detail="Failed to connect to task queue!",
         )
 
-    successful_deploy = range_to_deploy.deploy()
-    if not successful_deploy:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to deploy range: {template.name} ({range_to_deploy.id})!",
-        )
-
-    # Build range schema
-    range_schema = RangeSchema(
-        **deploy_range.model_dump(),
-        id=range_to_deploy.id,
-        date=datetime.now(tz=timezone.utc),
-        template=template.model_dump(mode="json"),
-        state_file=range_to_deploy.get_state_file(),
-        state=RangeState.ON,  # User manually starts after deployment
+    job = await queue.pool.enqueue_job(
+        "deploy_range",
+        deploy_range.model_dump(mode="json"),
+        decrypted_secrets,
+        current_user.id,
+        current_user.is_admin,
     )
 
-    # Save deployed range info to database
-    created_range_model = await create_range(db, range_schema, owner_id=current_user.id)
-    if not created_range_model:
+    if not job:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save deployed range to database. Range: {range_to_deploy.template.name} ({range_to_deploy.id})",
+            detail="Failed queue up deployment job!",
         )
 
-    return RangeID(id=range_schema.id)
+    return Job(id=job.job_id)
 
 
 @router.delete("/{range_id}")
@@ -254,5 +243,5 @@ async def delete_range_endpoint(
         )
 
     return MessageSchema(
-        message=f"Successfully destroyed range: {range_obj.template.name} ({range_id})"
+        message=f"Successfully destroyed range: {range_obj.name} ({range_id})"
     )

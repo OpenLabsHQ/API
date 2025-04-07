@@ -105,9 +105,7 @@ class AbstractBaseRange(ABC):
 
         """
         try:
-            logger.info(
-                "Synthesizing selected range: %s (%s)", self.template.name, self.id
-            )
+            logger.info("Synthesizing selected range: %s (%s)", self.name, self.id)
 
             # Create CDKTF app
             app = App(outdir=settings.CDKTF_DIR)
@@ -126,9 +124,8 @@ class AbstractBaseRange(ABC):
             # Synthesize Terraform files
             app.synth()
             logger.info(
-                "Range: %s (%s) synthesized successfully as: %s",
+                "Template: %s synthesized successfully as Stack: %s",
                 self.template.name,
-                self.id,
                 self.stack_name,
             )
 
@@ -136,7 +133,14 @@ class AbstractBaseRange(ABC):
             return True
         except Exception as e:
             logger.error(
-                "Error during synthesis of stack: %s. Error: %s", self.stack_name, e
+                "Caught exception during synthesis of stack %s. Type: %s, Args: %s",
+                self.stack_name,
+                type(e).__name__,
+                e.args,
+            )
+            # Use logger.exception to automatically include the traceback
+            logger.exception(
+                "Traceback for synthesis error in stack %s:", self.stack_name
             )
             return False
 
@@ -160,9 +164,7 @@ class AbstractBaseRange(ABC):
             # Terraform apply
             env = os.environ.copy()
             env.update(self.get_cred_env_vars())
-            logger.info(
-                "Deploying selected range: %s (%s)", self.template.name, self.id
-            )
+            logger.info("Deploying selected range: %s (%s)", self.name, self.id)
             subprocess.run(  # noqa: S603
                 ["terraform", "apply", "--auto-approve"],  # noqa: S607
                 check=True,
@@ -192,9 +194,13 @@ class AbstractBaseRange(ABC):
             return True
         except subprocess.CalledProcessError as e:
             logger.error("Terraform command failed: %s", e)
+            logger.exception(
+                "Traceback for deploy subprocess error in stack %s:", self.stack_name
+            )
             return False
         except Exception as e:
             logger.error("Error during deployment: %s", e)
+            logger.exception("Traceback for deploy error in stack %s:", self.stack_name)
             return False
 
     def destroy(self) -> bool:
@@ -251,9 +257,15 @@ class AbstractBaseRange(ABC):
             return True
         except subprocess.CalledProcessError as e:
             logger.error("Terraform command failed: %s", e)
+            logger.exception(
+                "Traceback for destroy subprocess error in stack %s:", self.stack_name
+            )
             return False
         except Exception as e:
             logger.error("Error during destroy: %s", e)
+            logger.exception(
+                "Traceback for destroy error in stack %s:", self.stack_name
+            )
             return False
 
     def is_synthesized(self) -> bool:

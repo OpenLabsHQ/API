@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -26,6 +27,14 @@ local_session = async_sessionmaker(
 
 async def async_get_db() -> AsyncGenerator[AsyncSession, None]:
     """Yield async Postgres session."""
+    async_session = local_session
+    async with async_session() as db:
+        yield db
+
+
+@asynccontextmanager
+async def managed_async_get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Yield a contextlib managed async Postgres session."""
     async_session = local_session
     async with async_session() as db:
         yield db

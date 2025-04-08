@@ -184,9 +184,7 @@ class AbstractBaseRange(ABC):
                 return False
 
             self._is_deployed = True
-            logger.info(
-                "Successfully deployed range: %s (%s)", self.template.name, self.id
-            )
+            logger.info("Successfully deployed range: %s (%s)", self.name, self.id)
 
             # Delete files made during deployment
             os.chdir(initial_dir)

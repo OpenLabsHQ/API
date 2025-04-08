@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class Job(BaseModel):
     """Remote task executed as an ARQ job."""
 
-    id: str = Field(..., description="ID of the job.")
+    job_id: str = Field(..., description="ID of the job.")
 
 
 class JobInfo(BaseModel):
@@ -25,8 +25,8 @@ class JobInfo(BaseModel):
     finish_time: datetime | None = Field(
         default=None, description="Finish time of the task."
     )
-    status: JobStatus | None = Field(
-        default=None,
+    status: JobStatus = Field(
+        ...,
         description="Current status of the task.",
         examples=[JobStatus.in_progress, JobStatus.complete],
     )

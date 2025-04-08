@@ -35,9 +35,9 @@ async def get_job_info(job_id: str) -> JobInfo:
                 detail=f"Could not find job with ID: {job_id}",
             )
 
-        job_status = await job.status()
-
         job_data = dict(vars(redis_job_info))
-        job_data["status"] = job_status
+
+    job_status = await job.status()
+    job_data["status"] = job_status
 
     return JobInfo.model_validate(job_data, from_attributes=True)

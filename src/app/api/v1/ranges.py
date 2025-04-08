@@ -122,7 +122,7 @@ async def deploy_range_from_template_endpoint(
             detail="Failed queue up deployment job!",
         )
 
-    return Job(id=job.job_id)
+    return Job.model_validate(job, from_attributes=True)
 
 
 @router.delete("/{range_id}")

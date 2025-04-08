@@ -80,6 +80,7 @@ class RedisQueueSettings(BaseSettings):
 
     REDIS_QUEUE_HOST: str = config("REDIS_QUEUE_HOST", default="localhost")
     REDIS_QUEUE_PORT: int = config("REDIS_QUEUE_PORT", default=6379)
+    REDIS_QUEUE_PASSWORD: str = config("REDIS_QUEUE_PASSWORD", default="ChangeMe123!")
 
 
 class Settings(

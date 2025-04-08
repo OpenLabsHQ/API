@@ -22,7 +22,11 @@ async def create_tables() -> None:
 async def create_redis_queue_pool() -> None:
     """Create Redis queue pool."""
     queue.pool = await create_pool(
-        RedisSettings(host=settings.REDIS_QUEUE_HOST, port=settings.REDIS_QUEUE_PORT)
+        RedisSettings(
+            host=settings.REDIS_QUEUE_HOST,
+            port=settings.REDIS_QUEUE_PORT,
+            password=settings.REDIS_QUEUE_PASSWORD,
+        )
     )
 
 

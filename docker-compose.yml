@@ -67,6 +67,9 @@ services:
 
   redis:
     image: redis:alpine
+    env_file:
+      - .env
+    command: ["redis-server", "--loglevel", "warning", "--requirepass", "${REDIS_QUEUE_PASSWORD}"]
     volumes:
       - redis-data:/data
     expose:

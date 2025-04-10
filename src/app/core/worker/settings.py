@@ -6,7 +6,8 @@ from ...core.config import settings
 
 # Import logger to ensure workers log messages properly
 from ..logger import LOG_DIR  # noqa: F401
-from .functions import deploy_range, shutdown, startup
+from .functions import shutdown, startup
+from .ranges import deploy_range
 
 
 class WorkerSettings:

@@ -111,7 +111,7 @@ async def deploy_range_from_template_endpoint(
     job = await queue.pool.enqueue_job(
         "deploy_range",
         deploy_range.model_dump(mode="json"),
-        decrypted_secrets,
+        decrypted_secrets.model_dump(mode="json"),
         current_user.id,
         current_user.is_admin,
     )

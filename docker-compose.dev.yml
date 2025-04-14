@@ -26,9 +26,7 @@ services:
       - .env
     volumes:
       - .:/code
-    environment:
-      - HEALTH_CHECK_URL=http://fastapi_dev:80/api/v1/health/ping
-    command: ["python", "/code/src/scripts/create_admin.py"]
+    command: ["python", "-m", "src.scripts.create_admin"]
     depends_on:
       fastapi_dev:
         condition: service_started

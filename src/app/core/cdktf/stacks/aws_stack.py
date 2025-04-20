@@ -1,3 +1,4 @@
+import base64
 from cdktf import TerraformOutput
 from cdktf_cdktf_provider_aws.ec2_transit_gateway import Ec2TransitGateway
 from cdktf_cdktf_provider_aws.ec2_transit_gateway_route import Ec2TransitGatewayRoute
@@ -23,6 +24,7 @@ from ....enums.regions import AWS_REGION_MAP, OpenLabsRegion
 from ....enums.specs import AWS_SPEC_MAP
 from ....schemas.template_range_schema import TemplateRangeSchema
 from .base_stack import AbstractBaseStack
+from ....utils.crypto import generate_ed25519_key_pair
 
 
 class AWSStack(AbstractBaseStack):
@@ -56,12 +58,21 @@ class AWSStack(AbstractBaseStack):
         )
 
         # Step 1: Create the key access to all instances provisioned on AWS
+        # Generate ed25519 key pair
+        range_private_key, range_public_key = generate_ed25519_key_pair()
         key_pair = KeyPair(
             self,
-            f"{range_name}-JumpBoxKeyPair",
-            key_name=f"{range_name}-cdktf-key",
-            public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH8URIMqVKb6EAK4O+E+9g8df1uvcOfpvPFl7sQrX7KM email@example.com",  # NOTE: Hardcoded key, will need a way to dynamically add a key to user instances
+            f"{range_name}-KeyPair",
+            key_name=f"{range_name}-cdktf-public-key",
+            public_key=range_public_key, #"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH8URIMqVKb6EAK4O+E+9g8df1uvcOfpvPFl7sQrX7KM email@example.com",  # NOTE: Hardcoded key, will need a way to dynamically add a key to user instances
             tags={"Name": "cdktf-public-key"},
+        )
+
+        TerraformOutput(
+            self,
+            f"{range_name}-private-key",
+            value=range_private_key,
+            description="Private key to access range machines",
         )
 
         # Step 2: Create public vpc for jumpbox
@@ -93,7 +104,7 @@ class AWSStack(AbstractBaseStack):
             cidr_block="10.255.99.0/24",
             availability_zone="us-east-1a",
             map_public_ip_on_launch=True,
-            tags={"Name": "JumpBoxPublicSubnet"},
+            tags={"Name": "JumpBoxVPCPublicSubnet"},
         )
 
         # Step 4: Create Security Group and Rules for Jump Box (only allow SSH directly into jump box, for now)
@@ -139,13 +150,13 @@ class AWSStack(AbstractBaseStack):
 
         TerraformOutput(
             self,
-            "JumpboxPublicIp",
+            f"{range_name}-JumpboxPublicIp",
             value=jumpbox.public_ip,
             description="Public IP address of the Jumpbox instance",
         )
         TerraformOutput(
             self,
-            "JumpboxInstanceId",
+            f"{range_name}-JumpboxInstanceId",
             value=jumpbox.id,
             description="Instance ID of the Jumpbox instance",
         )
@@ -202,7 +213,7 @@ class AWSStack(AbstractBaseStack):
             cidr_block="10.255.98.0/24",
             availability_zone="us-east-1a",
             map_public_ip_on_launch=False,
-            tags={"Name": "JumpBoxPublicSubnet"},
+            tags={"Name": "JumpBoxVPCPrivateSubnet"},
         )
 
         # Step 10: Create Routing for range network (Using NAT gateway)

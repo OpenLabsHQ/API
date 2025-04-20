@@ -24,7 +24,7 @@ from ....enums.regions import AWS_REGION_MAP, OpenLabsRegion
 from ....enums.specs import AWS_SPEC_MAP
 from ....schemas.template_range_schema import TemplateRangeSchema
 from .base_stack import AbstractBaseStack
-from ....utils.crypto import generate_ed25519_key_pair
+from ....utils.crypto import generate_range_rsa_key_pair
 
 
 class AWSStack(AbstractBaseStack):
@@ -59,12 +59,12 @@ class AWSStack(AbstractBaseStack):
 
         # Step 1: Create the key access to all instances provisioned on AWS
         # Generate ed25519 key pair
-        range_private_key, range_public_key = generate_ed25519_key_pair()
+        range_private_key, range_public_key = generate_range_rsa_key_pair()
         key_pair = KeyPair(
             self,
             f"{range_name}-KeyPair",
             key_name=f"{range_name}-cdktf-public-key",
-            public_key=range_public_key, #"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH8URIMqVKb6EAK4O+E+9g8df1uvcOfpvPFl7sQrX7KM email@example.com",  # NOTE: Hardcoded key, will need a way to dynamically add a key to user instances
+            public_key=range_public_key,
             tags={"Name": "cdktf-public-key"},
         )
 

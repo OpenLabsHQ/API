@@ -7,7 +7,7 @@ aiohttp>=3.9.0
 
 # CDKTF
 cdktf>=0.20
-cdktf-cdktf-provider-aws>=19.52
+cdktf-cdktf-provider-aws>=19.60
 
 # Auth
 pyjwt

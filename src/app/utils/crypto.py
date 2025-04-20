@@ -6,7 +6,7 @@ from argon2.low_level import Type, hash_secret_raw
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa, ed25519
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 
 # RSA Key Generation
@@ -38,16 +38,18 @@ def generate_rsa_key_pair() -> Tuple[str, str]:
     return private_b64, public_b64
 
 # ed25519 Key Generation
-def generate_ed25519_key_pair() -> Tuple[str, str]:
-    """Generate an ed25519 key pair and return base64 encoded strings."""
-    private_key = ed25519.Ed25519PrivateKey.generate()
+def generate_range_rsa_key_pair() -> Tuple[str, str]:
+    """Generate an rsa key pair and return base64 encoded strings."""
+    private_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
 
     public_key = private_key.public_key()
 
     # Serialize private key
     private_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.OpenSSH,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     )
 

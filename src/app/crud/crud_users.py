@@ -276,14 +276,14 @@ async def get_decrypted_secrets(
 
 
 async def update_user_password(
-    db: AsyncSession, user_id: UUID, current_password: str, new_password: str
+    db: AsyncSession, user_id: int, current_password: str, new_password: str
 ) -> bool:
     """Update a user's password.
 
     Args:
     ----
         db (AsyncSession): Async database connection.
-        user_id (UUID): User ID.
+        user_id (int): User ID.
         current_password (str): Current password.
         new_password (str): New password.
 
@@ -343,3 +343,26 @@ async def update_user_password(
     await db.commit()
 
     return True
+
+
+async def get_all_users(db: AsyncSession) -> list[UserModel]:
+    """Get all users.
+
+    Args:
+    ----
+        db (AsyncSession): Database connection.
+
+    Returns:
+    -------
+        list[UserModel]: List of all users.
+
+    """
+    mapped_user_model = inspect(UserModel)
+    main_columns = [
+        getattr(UserModel, attr.key) for attr in mapped_user_model.column_attrs
+    ]
+
+    stmt = select(UserModel).options(load_only(*main_columns))
+    result = await db.execute(stmt)
+
+    return list(result.scalars().all())

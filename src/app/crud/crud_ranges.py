@@ -51,8 +51,32 @@ async def get_blueprint_range_headers(
         BlueprintRangeModel.vpn,
     ).select_from(BlueprintRangeModel)
 
+    # If not admin, we need to get the user's own blueprints
+    # and also blueprints shared with them through workspaces
     if not is_admin:
-        stmt = stmt.filter(BlueprintRangeModel.owner_id == user_id)
+        try:
+            from .crud_blueprint_permissions import get_user_workspaces_with_blueprint_access
+            from sqlalchemy import or_, func
+
+            # First, get a list of blueprints shared through workspaces
+            # Use a subquery to find all blueprint IDs the user has access to via permissions
+            from ..models.blueprint_permission_model import BlueprintPermissionModel
+            from ..enums.permissions import PermissionEntityType
+
+            # Filter for owner or user with permissions
+            stmt = stmt.filter(or_(
+                BlueprintRangeModel.owner_id == user_id,
+                BlueprintRangeModel.id.in_(
+                    select(BlueprintPermissionModel.blueprint_id)
+                    .where(BlueprintPermissionModel.blueprint_type == "range_blueprints")
+                    .where(BlueprintPermissionModel.entity_type == PermissionEntityType.USER)
+                    .where(BlueprintPermissionModel.entity_id == user_id)
+                )
+            ))
+        except Exception as e:
+            logger.error(f"Error including shared blueprints: {e}")
+            # Fallback to just getting owned blueprints
+            stmt = stmt.filter(BlueprintRangeModel.owner_id == user_id)
 
     result = await db.execute(stmt)
 
@@ -99,9 +123,30 @@ async def get_blueprint_range(
         )
         return None
 
+    # First check direct ownership or admin 
     if is_admin or range_model.owner_id == user_id:
-        logger.debug("Fetched range blueprint: %s for user %s.", range_id, user_id)
+        logger.debug("Fetched range blueprint: %s for user %s (owner/admin).", range_id, user_id)
         return BlueprintRangeSchema.model_validate(range_model)
+        
+    # If not owner or admin, check for permission through workspace
+    try:
+        from .crud_blueprint_permissions import check_user_blueprint_access
+        from ..enums.permissions import PermissionType
+        
+        # Check if user has access through workspace permissions
+        has_access = await check_user_blueprint_access(
+            db, 
+            user_id, 
+            "range_blueprints", 
+            range_id, 
+            PermissionType.READ
+        )
+        
+        if has_access:
+            logger.debug("Fetched range blueprint: %s for user %s (via workspace permission).", range_id, user_id)
+            return BlueprintRangeSchema.model_validate(range_model)
+    except Exception as e:
+        logger.error(f"Error checking blueprint permissions: {e}")
 
     logger.warning(
         "User: %s is not authorized to fetch range blueprint: %s.", user_id, range_id

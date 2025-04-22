@@ -41,3 +41,8 @@ class UserModel(Base, OpenLabsUserMixin):
         cascade="all, delete-orphan",
         uselist=False,
     )
+
+    # Relationship with workspaces through workspace_users
+    workspace_users = relationship(
+        "WorkspaceUserModel", back_populates="user", cascade="all, delete-orphan"
+    )

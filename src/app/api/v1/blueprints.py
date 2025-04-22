@@ -1,6 +1,7 @@
+from uuid import UUID
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from ...core.auth.auth import get_current_user
@@ -29,6 +30,23 @@ from ...crud.crud_vpcs import (
     get_blueprint_vpc,
     get_blueprint_vpc_headers,
 )
+
+from ...crud.crud_blueprint_permissions import (
+    create_blueprint_permission,
+    delete_blueprint_permission,
+    get_blueprint_permission,
+    get_blueprint_permissions_by_blueprint,
+)
+
+from ...schemas.blueprint_permission_schema import (
+    BlueprintPermissionCreateSchema,
+    BlueprintPermissionSchema,
+)
+
+from ...schemas.message_schema import MessageSchema
+from ...models.blueprint_permission_model import BlueprintPermissionModel
+
+
 from ...models.user_model import UserModel
 from ...schemas.host_schemas import (
     BlueprintHostCreateSchema,
@@ -536,7 +554,7 @@ async def upload_blueprint_subnet_endpoint(
 
 
 @router.delete("/subnets/{blueprint_id}")
-async def delete_subnet_template_endpoint(
+async def delete_subnet_blueprint_endpoint(
     blueprint_id: int,
     db: AsyncSession = Depends(async_get_db),  # noqa: B008
     current_user: UserModel = Depends(get_current_user),  # noqa: B008
@@ -743,3 +761,166 @@ async def delete_blueprint_host_endpoint(
     return MessageSchema(
         message=f"Host blueprint: {deleted_blueprint.hostname} ({deleted_blueprint.id}) was successfully deleted!"
     )
+
+@router.post("/{blueprint_type}/{blueprint_id}/permissions", response_model=BlueprintPermissionSchema)
+async def add_permission_to_blueprint(
+    permission: BlueprintPermissionCreateSchema,
+    blueprint_type: str = Path(
+        ...,
+        description="Type of the blueprint (range, vpc, subnet, host)",
+        examples=[
+            "range_blueprints",
+            "vpc_blueprints",
+            "subnet_blueprints",
+            "host_blueprints",
+        ],
+    ),
+    blueprint_id: int = Path(
+        ...,
+        description="ID of the blueprint",
+    ),
+    current_user: UserModel = Depends(get_current_user),  # noqa: B008
+    db: AsyncSession = Depends(async_get_db),  # noqa: B008
+) -> BlueprintPermissionModel:
+    """Add a permission to a blueprint.
+
+    Args:
+        permission (BlueprintPermissionCreateSchema): Permission data to be added.
+        blueprint_type (str): Type of the blueprint (range, vpc, subnet, host).
+        blueprint_id (int): ID of the blueprint.
+        current_user (UserModel): Currently authenticated user.
+        db (AsyncSession): Async database connection.
+
+    Returns:
+        BlueprintPermissionModel: The created permission object.
+
+    Raises:
+        HTTPException: If the permission could not be created or if the user does not have access to the blueprint.
+    """
+    # Only admin or blueprint owners can add permissions
+    # This would need to check ownership based on the blueprint type
+    # For now, we're simplifying by only allowing admins
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can manage permissions",
+        )
+
+    # Verify that the blueprint_type and blueprint_id in the path match the permission data
+    if (
+        permission.blueprint_type != blueprint_type
+        or permission.blueprint_id != blueprint_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Blueprint type and ID in path must match permission data",
+        )
+
+    return await create_blueprint_permission(db, permission)
+
+
+@router.get("/{blueprint_type}/{blueprint_id}/permissions", response_model=BlueprintPermissionSchema)
+async def get_permission_for_blueprint(
+    blueprint_type: str = Path(
+        ...,
+        description="Type of the blueprint (range, vpc, subnet, host)",
+        examples=[
+            "range_blueprints",
+            "vpc_blueprints",
+            "subnet_blueprints",
+            "host_blueprints",
+        ],
+    ),
+    blueprint_id: int = Path(
+        ...,
+        description="ID of the blueprint",
+    ),
+    current_user: UserModel = Depends(get_current_user),  # noqa: B008
+    db: AsyncSession = Depends(async_get_db),  # noqa: B008
+) -> list[BlueprintPermissionModel]:
+    """Get a permission for a blueprint.
+
+    Args:
+        blueprint_type (str): Type of the blueprint (range, vpc, subnet, host).
+        blueprint_id (int): ID of the blueprint.
+        current_user (UserModel): Currently authenticated user.
+        db (AsyncSession): Async database connection.
+
+    Returns:
+        BlueprintPermissionModel: The permission object.
+
+    Raises:
+        HTTPException: If the permission could not be retrieved or if the user does not have access to the blueprint.
+    """
+    # Only admin or blueprint owners can view permissions
+    # This would need to check ownership based on the blueprint type
+    # For now, we're simplifying by only allowing admins
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can view permissions",
+        )
+
+    return await get_blueprint_permissions_by_blueprint(db, blueprint_type, blueprint_id)
+
+@router.delete(
+    "/{blueprint_type}/{blueprint_id}/permissions/{permission_id}",
+    response_model=MessageSchema,
+)
+async def delete_permission_from_blueprint(
+    blueprint_type: str = Path(
+        ..., description="The type of blueprint (range, vpc, etc.)"
+    ),
+    blueprint_id: int = Path(..., description="The ID of the blueprint"),
+    permission_id: UUID = Path(..., description="The ID of the permission to delete"),
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(async_get_db),
+) -> MessageSchema:
+    """Delete a permission from a blueprint.
+    Args:
+    ----
+        blueprint_type (str): The type of blueprint.
+        blueprint_id (int): The ID of the blueprint.
+        permission_id (UUID): The ID of the permission to delete.
+        current_user (UserModel): The authenticated user.
+        db (AsyncSession): Database connection.
+    Returns:
+    -------
+        MessageSchema: Success message.
+    """
+    # Only admin or blueprint owners can delete permissions
+    # This would need to check ownership based on the blueprint type
+    # For now, we're simplifying by only allowing admins
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can manage permissions",
+        )
+
+    # Get the permission to check if it belongs to the specified blueprint
+    permission = await get_blueprint_permission(db, permission_id)
+    if not permission:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Permission not found",
+        )
+
+    # Verify that the permission is for the specified blueprint
+    if (
+        permission.blueprint_type != blueprint_type
+        or permission.blueprint_id != blueprint_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Permission does not belong to the specified blueprint",
+        )
+
+    # Delete the permission
+    success = await delete_blueprint_permission(db, permission_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete permission",
+        )
+
+    return MessageSchema(message="Permission deleted successfully")

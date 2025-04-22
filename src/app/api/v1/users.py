@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 from ...core.auth.auth import get_current_user
 from ...core.config import settings
 from ...core.db.database import async_get_db
-from ...crud.crud_users import get_user_by_id, update_user_password
+from ...crud.crud_users import get_user_by_id, update_user_password, get_all_users
 from ...models.secret_model import SecretModel
 from ...models.user_model import UserModel
 from ...schemas.message_schema import (
@@ -48,7 +48,7 @@ async def get_user_info(
 
     """
     return UserInfoResponseSchema(
-        name=current_user.name, email=current_user.email, admin=current_user.is_admin
+        id=current_user.id, name=current_user.name, email=current_user.email, admin=current_user.is_admin
     )
 
 
@@ -282,3 +282,35 @@ async def update_azure_secrets(
     return AzureUpdateSecretMessageSchema(
         message="Azure credentials updated successfully"
     )
+
+@router.get("")
+async def get_all_users_endpoint(
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(async_get_db),
+) -> list[UserInfoResponseSchema]:
+    """Get all users (admin only).
+    Args:
+    ----
+        current_user (UserModel): The authenticated user.
+        db (AsyncSession): Database connection.
+    Returns:
+    -------
+        list[UserInfoResponseSchema]: List of all users.
+    """
+    # Only admins can see all users
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can view all users",
+        )
+
+    # Get all users
+    users = await get_all_users(db)
+
+    # Convert to response schema
+    return [
+        UserInfoResponseSchema(
+            id=user.id, name=user.name, email=user.email, admin=user.is_admin
+        )
+        for user in users
+    ]

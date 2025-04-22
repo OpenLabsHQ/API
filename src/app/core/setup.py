@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncContextManager, AsyncGenerator, Callable
 
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .config import AppSettings, DatabaseSettings
 from .db.database import Base
@@ -89,5 +90,14 @@ def create_application(
 
     app = FastAPI(lifespan=lifespan, **kwargs)
     app.include_router(router)
+
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://openlabs.sh"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     return app
